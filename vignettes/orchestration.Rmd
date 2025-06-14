@@ -1,0 +1,268 @@
+---
+title: "Orchestration of Targets Pipelines with tarflowr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Orchestration of Targets Pipelines with tarflowr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE,
+    collapse = TRUE,
+    comment = "#>",
+    eval = FALSE
+)
+```
+
+## Introduction
+
+This vignette demonstrates how to use `tarflowr` to manage complex, hierarchical
+workflows. This pattern is common in scientific research where a primary
+analysis pipeline needs to be run on multiple independent datasets (e.g.,
+different study sites, simulation parameters, or patient cohorts). 
+
+We will simulate a soil science study with five distinct study sites. Our goal
+is to model the relationship between soil clay content and elevation at each
+site and then aggregate these models to understand the overall trends and
+variability. This workflow will involve two layers of orchestration:
+
+1.  **Sub-Projects:** For each of the five sites, we will use `tarflowr_run()`
+to create an independent project. This project will calculate depth-weighted
+average clay content for 10 soil profiles and then fit a parabolic linear model
+of `clay ~ elevation`. 
+
+2.  **Meta-orchestrator:** We will use a second, top-level `tarflowr_run()` call
+that uses the new helpers (`tarflowr_project()` and
+`tarflowr_run_subproject()`). This meta-pipeline will execute all five
+sub-projects in parallel and then combine their resulting models into a final
+summary table.
+
+## 1. Setup and Helper Functions
+
+First, we load the necessary packages and define the functions we'll need for
+our analysis.
+
+```{r helpers}
+# Load libraries
+library(tarflowr)
+library(targets)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(broom) 
+```
+
+This function `create_site_data()` creates a realistic-looking soil dataset for
+a single site.
+
+```{r}
+create_site_data <- function(site_id) {
+    set.seed(which(letters == tolower(site_id))) # for reproducibility
+    
+    # Site-specific elevation range and model parameters
+    elev_base <- runif(1, 100, 500)
+    elev_range <- runif(1, 50, 200)
+    
+    # Parabolic relationship parameters
+    # y = a(x - h)^2 + k
+    h <- elev_base + elev_range / 2 # vertex x-value (mid-elevation)
+    k <- runif(1, 15, 25)           # vertex y-value (min clay)
+    a <- runif(1, 0.001, 0.005)     # parabola steepness
+    
+    pedons <- tibble::tibble(
+        site_id = site_id,
+        pedon_id = paste0(site_id, "_", 1:10),
+        elevation = elev_base + runif(10) * elev_range
+    ) |>
+        dplyr::mutate(base_clay = a * (elevation - h)^2 + k + rnorm(10, 0, 2))
+    
+    # Generate horizon data for each pedon
+    purrr::map_dfr(1:nrow(pedons), function(i) {
+        p <- pedons[i, ]
+        depths <- c(0, 15, 30, 60, 100)
+        
+        # Randomly make some profiles shallow
+        if (runif(1) < 0.2) {
+            depths <- c(0, 15, runif(1, 20, 49))
+        }
+        
+        horizons <- tibble::tibble(
+            site_id = p$site_id,
+            pedon_id = p$pedon_id,
+            elevation = p$elevation,
+            hzn_top = head(depths, -1),
+            hzn_bottom = tail(depths, -1),
+            hzn_mid = (hzn_top + hzn_bottom) / 2
+        ) |>
+            dplyr::mutate(
+                # Add random argillic horizon effect
+                clay_pct = p$base_clay + (hzn_mid * runif(1, 0.05, 0.2)) + rnorm(n(), 0, 1.5),
+                clay_pct = pmax(5, clay_pct) # ensure clay is not negative
+            )
+        return(horizons)
+    })
+}
+```
+
+This function calculates depth weighted average clay content for a single pedon's data
+
+```{r}
+calculate_dwa_clay <- function(pedon_data, target_depth = 50) {
+    
+    dwa_data <- pedon_data |>
+        dplyr::filter(hzn_top < target_depth) |>
+        dplyr::mutate(
+            hzn_bottom_clipped = pmin(hzn_bottom, target_depth),
+            thickness = hzn_bottom_clipped - hzn_top
+        ) |>
+        dplyr::filter(thickness > 0)
+    
+    if (nrow(dwa_data) == 0) {
+        return(tibble(
+            pedon_id = unique(pedon_data$pedon_id),
+            elevation = unique(pedon_data$elevation),
+            dwa_clay = NA_real_
+        ))
+    }
+    
+    # Calculate DWA
+    dwa_result <- dwa_data |>
+        dplyr::summarise(dwa_clay = sum(clay_pct * thickness) / sum(thickness))
+    
+    tibble::tibble(
+        pedon_id = unique(pedon_data$pedon_id),
+        elevation = unique(pedon_data$elevation),
+        dwa_clay = dwa_result$dwa_clay
+    )
+}
+
+fit_clay_elevation_model <- function(dwa_clay_list) {
+    site_data <- dplyr::bind_rows(dwa_clay_list) |>
+        dplyr::filter(!is.na(dwa_clay))
+    
+    model <- lm(dwa_clay ~ elevation + I(elevation^2), data = site_data)
+    
+    list(list(
+        tidy = broom::tidy(model),
+        glance = broom::glance(model)
+    ))
+}
+```
+
+## 2. Generate and Run the Individual Site Sub-Projects
+
+Now, we will loop through our desired sites (A-E), generate the data for each,
+and run a `tarflowr` project for each one. This will create five independent,
+cached, and reproducible analyses.
+
+```{r run-subprojects}
+site_ids <- c("A", "B", "C", "D", "E")
+sub_project_dirs <- list()
+
+for (site in site_ids) {
+    project_path <- file.path(tempdir(), paste0("site_", site))
+    sub_project_dirs[[site]] <- project_path
+    
+    site_data <- create_site_data(site)
+    site_work_units <- split(site_data, site_data$pedon_id)
+    
+    tarflowr_run(
+        work_units = site_work_units,
+        process_func = calculate_dwa_clay,
+        combine_func = fit_clay_elevation_model,
+        project_dir = project_path,
+        result_target_name = "site_model_summary",
+        packages = c("dplyr", "tidyr", "broom"),
+        callr_function = callr::r_bg,
+        workers = 2 # Use 2 workers for the inner loop
+    )
+}
+```
+
+## 3. Orchestrate Sub-Projects with a Hierarchical Workflow
+
+With our five sub-projects completed, we can now use the hierarchical workflow
+helpers to run them all as a single meta-pipeline. This demonstrates how you
+could re-run or update all sites in parallel.
+
+```{r run-meta-orchestrator}
+hierarchical_work_units <- purrr::map(sub_project_dirs, ~ {
+    tarflowr_project(
+        project_dir = .x,
+        result_target = site_model_summary 
+    )
+})
+
+summarize_all_models <- function(model_summary_list) {
+    model_summary_list <- do.call('c', model_summary_list)
+    s <- do.call('rbind', lapply(model_summary_list, function(x) x$glance))
+    cs <- do.call('rbind', lapply(model_summary_list, function(x) x$tidy)) |> 
+        dplyr::group_by(term) |>
+        dplyr::summarize(
+            mean_estimate = mean(estimate),
+            sd_estimate = sd(estimate),
+            .groups = "drop"
+        )
+    
+    list(
+        coef_summary = cs, 
+        site_stats = s
+    )
+}
+
+meta_results <- tarflowr_run(
+    work_units = hierarchical_work_units,
+    process_func = tarflowr_run_subproject,
+    combine_func = summarize_all_models,
+    project_dir = file.path("_meta_analysis"),
+    workers = 2 # Run 2 sub-projects in parallel
+)
+```
+
+## 4. Final Results
+The meta-orchestrator has combined the results from all five sites. We can now
+view the final summary tables.
+
+### Site-Specific Model Fit Statistics
+This table shows the R-squared and RMSE for the parabolic model at each
+individual site.
+
+```{r results-stats, echo=FALSE}
+knitr::kable(
+  meta_results$site_stats,
+  caption = "Model Fit Statistics for Each Study Site"
+)
+```
+
+### Overall Model Parameter Summary
+
+This table shows the mean and standard deviation of the model coefficients
+(intercept, elevation, and elevation-squared) across all five sites, giving us
+an idea of the overall trend and its variability.
+
+```{r results-params, echo=FALSE}
+knitr::kable(
+  meta_results$coef_summary,
+  caption = "Summary of Model Coefficients Across All Sites"
+)
+```
+
+## Conclusion
+
+This vignette demonstrates `tarflowr`'s hierarchical workflow capabilities. We were able to:
+
+ -   Define a complex, multi-step analysis for a single study site.
+
+ -   Use `tarflowr` to create and run this analysis independently for five sites.
+
+ -   Use `tarflowr`'s meta-orchestration helpers (`tarflowr_project` and `tarflowr_run_subproject`) to run all five site-level pipelines as a single, parallelized workflow.
+
+ -   Aggregate the results from each independent pipeline into a final, comprehensive summary.
+
+This pattern provides a scalable, reproducible, and organized way to manage large-scale research projects.
+
+

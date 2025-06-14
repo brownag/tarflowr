@@ -1,0 +1,38 @@
+Package: tarflowr
+Type: Package
+Title: High-level Orchestration of 'targets' Pipelines 
+Version: 0.0.1
+Authors@R: c(
+    person(
+      "Andrew", "Brown",
+      email = "brown.andrewg@gmail.com",
+      role = c("aut", "cre"), 
+      comment = c(ORCID="0000-0002-4565-533X")
+    )
+  )
+Description: Provides a simple, high-level interface for creating
+    and executing 'targets'-based workflows, so users can focus on their specific 
+    analysis, not on pipeline orchestration. The philosophy of tarflowr is 
+    based on the concept of arbitrary "work units." This package is experimental.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Language: en-US
+RoxygenNote: 7.3.2
+Roxygen: list(markdown = TRUE)
+URL: https://github.com/brownag/rgeomorphon/, https://humus.rocks/rgeomorphon/
+BugReports: https://github.com/brownag/rgeomorphon/issues
+Imports: 
+    callr,
+    cli,
+    crew,
+    digest,
+    rlang,
+    targets,
+    utils,
+    withr
+Suggests: 
+    knitr,
+    renv,
+    rmarkdown,
+    yaml
+VignetteBuilder: knitr
