@@ -17,9 +17,10 @@ knitr::opts_chunk$set(
 
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![tarflowr Manual](https://img.shields.io/badge/docs-HTML-informational)](https://humus.rocks/tarflowr/)
 <!-- badges: end -->
 
-<img src = "https://i.imgur.com/vl0dkkc.png" alt = "tarflowr hexsticker" title = "tarflowr hexsticker" width = "45%" height = "45%" hspace="15" vspace="15" align="right"/>
+<img src = "https://i.imgur.com/vl0dkkc.png" alt = "tarflowr hexsticker" title = "tarflowr hexsticker" width = "40%" height = "40%" hspace="15" vspace="15" align="right"/>
 
 > [!NOTE]
 >

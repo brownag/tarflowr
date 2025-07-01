@@ -19,7 +19,7 @@ Encoding: UTF-8
 Language: en-US
 RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
-URL: https://github.com/brownag/tarflowr/, https://humus.rocks/tarflowr/
+URL: https://github.com/brownag/tarflowr/, https://humus.rocks/tarflowr/, http://humus.rocks/tarflowr/
 BugReports: https://github.com/brownag/tarflowr/issues
 Imports: 
     callr,

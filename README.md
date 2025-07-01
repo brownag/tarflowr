@@ -7,9 +7,11 @@
 
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![tarflowr
+Manual](https://img.shields.io/badge/docs-HTML-informational)](https://humus.rocks/tarflowr/)
 <!-- badges: end -->
 
-<img src = "https://i.imgur.com/vl0dkkc.png" alt = "tarflowr hexsticker" title = "tarflowr hexsticker" width = "45%" height = "45%" hspace="15" vspace="15" align="right"/>
+<img src = "https://i.imgur.com/vl0dkkc.png" alt = "tarflowr hexsticker" title = "tarflowr hexsticker" width = "40%" height = "40%" hspace="15" vspace="15" align="right"/>
 
 > \[!NOTE\]
 >
@@ -76,10 +78,10 @@ final_sum <- tarflowr_run(
   project_dir = PROJECT_DIR,
   workers = 4
 )
-#> ℹ Creating project directory: '/tmp/RtmpcjB94O/_my_first_project'
+#> ℹ Creating project directory: '/tmp/RtmppjxsU0/_my_first_project'
 #> 
 #> ── Starting tarflowr workflow ──────────────────────────────────────────────────
-#> • Project directory: '/tmp/RtmpcjB94O/_my_first_project'
+#> • Project directory: '/tmp/RtmppjxsU0/_my_first_project'
 #> • Number of work units: 10
 #> • Parallel workers: 4
 #> ℹ Executing targets pipeline...
@@ -88,16 +90,16 @@ final_sum <- tarflowr_run(
 #> + work_units_file dispatched
 #> ✔ work_units_file completed [0ms, 137 B]
 #> + user_functions dispatched
-#> ✔ user_functions completed [1ms, 150 B]
+#> ✔ user_functions completed [0ms, 150 B]
 #> + project_work_units dispatched
 #> ✔ project_work_units completed [0ms, 137 B]
 #> + work_seq dispatched
-#> ✔ work_seq completed [1ms, 99 B]
+#> ✔ work_seq completed [0ms, 99 B]
 #> + processed_unit declared [10 branches]
 #> ✔ processed_unit completed [10s, 514 B]
 #> + my_first_project_result dispatched
 #> ✔ my_first_project_result completed [0ms, 53 B]
-#> ✔ ended pipeline [10.3s, 16 completed, 0 skipped]
+#> ✔ ended pipeline [10.4s, 16 completed, 0 skipped]
 
 # result is 385
 final_sum
@@ -115,14 +117,14 @@ cached_sum <- tarflowr_run(
 )
 #> 
 #> ── Starting tarflowr workflow ──────────────────────────────────────────────────
-#> • Project directory: '/tmp/RtmpcjB94O/_my_first_project'
+#> • Project directory: '/tmp/RtmppjxsU0/_my_first_project'
 #> • Number of work units: 10
 #> • Parallel workers: 4
 #> ℹ Executing targets pipeline...
 #> + user_functions dispatched
-#> ✔ user_functions completed [0ms, 150 B]
+#> ✔ user_functions completed [1ms, 150 B]
 #> + processed_unit declared [10 branches]
-#> ✔ ended pipeline [231ms, 1 completed, 15 skipped]
+#> ✔ ended pipeline [234ms, 1 completed, 15 skipped]
 cached_sum
 #> [1] 385
 ```
