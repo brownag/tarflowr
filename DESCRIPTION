@@ -19,8 +19,8 @@ Encoding: UTF-8
 Language: en-US
 RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
-URL: https://github.com/brownag/rgeomorphon/, https://humus.rocks/rgeomorphon/
-BugReports: https://github.com/brownag/rgeomorphon/issues
+URL: https://github.com/brownag/tarflowr/, https://humus.rocks/tarflowr/
+BugReports: https://github.com/brownag/tarflowr/issues
 Imports: 
     callr,
     cli,
